@@ -1,0 +1,35 @@
+部署环境：
+ centos6.5
+
+这边只是简单的实现，因为现在网络上已经有很多脚本直接安装ss了
+开始部署：
+
+安装相关软件：
+yum update
+yum install python-setuptools && easy_install pip
+pip install shadowsocks
+
+配置ss文件：
+vi /etc/shadowsocks.json
+{
+"server":"your_server_ip",#你的服务器ip地址
+"port_password":{
+     "8381":"pass1", #端口：密码，自己修改
+     "8382":"pass2",
+     "8383":"pass3",
+     "8384":"pass4"
+     },
+"timeout":60,
+"method":"rc4-md5", #加密方式
+"fast_open":false,
+"workers":1
+}
+
+设置ss开机自启：
+ vi /etc/rc.local
+ ssserver -c /etc/shadowsocks.json -d start
+ 
+之后再重启vps就可以了
+
+
+ 
