@@ -1,0 +1,92 @@
+客户端环境：
+centos7.2
+
+使用Shadowsocks+Privoxy 走http代理
+
+安装相关软件:
+yum -y install epel-release
+yum -y install python-pip
+pip install shadowsocks
+yum install -y privoxy
+
+配置客户端文件:
+vi ss.json
+{
+"server":"服务器IP",
+"server_port":服务器端口,
+"local_address": "127.0.0.1",
+"local_port":1080,
+"password":"服务器密码",
+"timeout":300,
+"method":"rc4-md5",
+"fast_open": false
+}
+
+运行ss：
+sslocal -c ss.json #也可以添加到后天运行
+运行情况:
+[root@master ~]# sslocal -c ss.json
+INFO: loading config from ss.json
+2016-10-08 16:11:53 INFO     loading libcrypto from libcrypto.so.10
+2016-10-08 16:11:53 INFO     starting local at 127.0.0.1:1080
+
+ps aux |grep sslocal |grep -v “grep” #查看程序是否运行
+[root@master ~]# ps aux |grep sslocal |grep -v “grep”
+root      5259  0.2  0.1 208328 10612 pts/0    S+   16:51   0:00 /usr/bin/python /usr/bin/sslocal -c ss.json
+root      5300  0.0  0.0 112660   960 pts/1    S+   16:51   0:00 grep --color=auto sslocal
+
+这样ss服务就起来了。配置privoxy文件：
+vi /etc/privoxy/config
+中间可找到本地的http接口
+listen-address  127.0.0.1:8118 #这边配置不需要修改，只是查看端口是8118
+
+利用vi的搜索功能输入：forward-socks5 查找到以下模式的配置：
+forward-socks5 / 127.0.0.1:1080 . #原本配置是注释掉的要去掉，1080是ss.josn中的配置端口要保持一致
+
+重启privoxy服务;
+service privoxy restart
+
+这样privoxy服务起来，现在要让http走8118
+export http_proxy='http://master.com:8118' # master.com是我的hostname，要改成成自己的hostname，实在不行直接用127.0.0.1也是可以的
+export https_proxy='http://master.com:8118'
+#这个命令可以写在配置文件中
+
+这样就可以访问curl谷歌了：
+[root@master ~]# curl www.google.com
+]<!doctype html><html itemscope="" itemtype="http://schema.org/WebPage" lang="en"><head><meta content="Search the world's information, including webpages, images, videos and more. Google has many special features to help you find exactly what you're looking for." name="description"><meta content="noodp" name="robots"><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"><meta content="/images/branding/googleg/1x/googleg_standard_color_128dp.png" itemprop="image"><title>Google</title><script>(function(){window.google={kEI:'drb4V-uHJsfd0ATi7ZTIBQ',kEXPI:'750401,750721,1351633,1351949,3700285,3700400,4029815,4031109,4032678,4036527,4038012,4039268,4043492,4045839,4048347,4052304,4058544,4065786,4067356,4067860,4067924,4068550,4069148,4069839,4069840,4070327,4071604,4071842,4072289,4072364,4072602,4072688,4072705,4072775,4073111,4073405,4073419,4073959,4074684,4074809,4076071,4076082,4076096,4076121,4076543,4076930,4076940,4076999,4077039,4077199,4077219,4077222,4077298,4078179,4078430,4078456,4078538,4078552,4079105,4079260,4079388,4079623,4079871,4080099,4080105,4080197,4080220,4080230,4080463,4080500,4080513,4081037,4081038,4081058,4081116,4081260,4081264,4081427,4081519,4081521,8300273,8502184,8503585,8504111,8504846,8505150,8505152,8506251,8506255,8506417,8506615,8506951,8507025,8507045,8507061,8507124,8507176,8507204,8507273,8507380,10200083,10202107,13500016',authuser:0,kscs:'c9c918f0_24'};google.kHL='en';})();(function(){google.lc=[];google.li=0;google.getEI=fu
+
+这里只是截取一部分，有返回这些就是成功访问了。
+
+接下来就是docker的代理:
+这边要先关闭docker，不然会执行这个命令会出错：
+http_proxy='http://master.com:8118' docker daemon #这边的master.con也是要对应自己的hostname，也可以用127.0.0.1来取代
+这样就启动代理了
+执行情况
+[root@master ~]# http_proxy='http://master.com:8118' docker daemon
+WARN[0000] devmapper: Usage of loopback devices is strongly discouraged for production use. Please use `--storage-opt dm.thinpooldev` or use `man docker` to refer to dm.thinpooldev section. 
+WARN[0000] devmapper: Base device already exists and has filesystem xfs on it. User specified filesystem  will be ignored. 
+INFO[0000] [graphdriver] using prior storage driver "devicemapper" 
+INFO[0000] Graph migration to content-addressability took 0.00 seconds 
+INFO[0000] Firewalld running: true                      
+INFO[0000] Default bridge (docker0) is assigned with an IP address 172.17.0.0/16. Daemon option --bip can be used to set a preferred IP address 
+INFO[0000] Loading containers: start.                   
+...........
+INFO[0000] Loading containers: done.                    
+INFO[0000] Daemon has completed initialization          
+INFO[0000] Docker daemon                                 commit=cb079f6-unsupported execdriver=native-0.2 graphdriver=devicemapper version=1.10.3
+INFO[0000] API listen on /var/run/docker.sock           
+
+测试一下：
+docker pull gcr.io/google_containers/pause:0.8.0
+[root@master ~]# docker pull gcr.io/google_containers/pause:0.8.0
+Trying to pull repository gcr.io/google_containers/pause ... 
+0.8.0: Pulling from gcr.io/google_containers/pause
+
+a3ed95caeb02: Pull complete 
+bccc832946aa: Pull complete 
+Digest: sha256:bbeaef1d40778579b7b86543fe03e1ec041428a50d21f7a7b25630e357ec9247
+Status: Downloaded newer image for gcr.io/google_containers/pause:0.8.0
+因为服务都是在前台，所以我们可以在docker的那个终端看到这个输出
+INFO[0047] {Action=create, Username=root, LoginUID=0, PID=6276}
+
+如果有问题可以及时跟我联系，请多多见谅
