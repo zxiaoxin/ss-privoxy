@@ -5,8 +5,8 @@
 开始部署：
 
 安装相关软件：
-yum update
-yum install python-setuptools && easy_install pip
+yum update -y
+yum install -y python-setuptools && easy_install pip
 pip install shadowsocks
 
 配置ss文件：
