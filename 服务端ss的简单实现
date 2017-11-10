@@ -8,7 +8,7 @@
 yum update -y
 yum install -y python-setuptools && easy_install pip
 pip install shadowsocks
-
+pip install M2Crypto  #加密依赖包
 配置ss文件：
 vi /etc/shadowsocks.json
 {
